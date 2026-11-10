@@ -43,21 +43,32 @@ so these ARE full-res frame costs), seconds per frame:
   **Creating the repo + uploading + running the workflows needs the live browser — a subagent cannot do it.**
 - Upload: the whole `~/workspace/manjhi-3d-short/` tree MINUS `node_modules/`, `out/`, `remotion-tmp`
   (package.json + package-lock.json pin remotion 4.0.542 / three 0.169.0; `npm ci` on the runner).
-  `public/` has NO Kenney GLBs (missing from the skill zip; world tolerates it — trees/bushes are
-  code-drawn veg; only lantern/cart/stall/windmill/canoe/lily/flowers are absent).
+  `public/` now HAS 15 Kenney GLBs (Nature Kit, CC0, placed 2026-11-10 — tree_oak, tree_default,
+  tree_detailed, tree_fat, tree_cone, plant_bush, plant_bushLarge, plant_bushDetailed,
+  flower_redA, flower_yellowA, flower_purpleA, grass, grass_large, lily_large, canoe). 11 of the
+  26 names never need a GLB (procedural veg / painted banners); 6 (lantern, cart, stall-red,
+  stall-green, stall-bench, windmill) do not exist in Kenney's catalog and are silently absent
+  by design (see VIDEO_REPORT_NOTES.md §5).
   **Workflow files cannot be pushed by a GitHub App token** (learned on payeng-render: GH006 + the
   `workflows: write` permission is invalid in YAML) — the two `.github/workflows/*.yml` files must be
   created via the web UI, exactly like render-test.yml/render.yml were on payeng-render.
-- **Workflows are WRITTEN and in the tree (ready to paste into the web UI):**
-  - `.github/workflows/render-speed-test.yml` — ONE job, `--frames=0-9`, prints RENDER_SECONDS and
+- **Workflows are WRITTEN and in the tree (ready to paste into the web UI). RENDER METHOD
+  (2026-11-10): STILLS, not `remotion render` — `remotion render` tiles frames 1+ at 1080x1920
+  under SwiftShader (Chrome compositor defect; see VIDEO_REPORT_NOTES.md §6). Each frame is
+  rendered as a still (fresh browser page) by `scripts/manjhi-render-shard.mjs` and encoded
+  to mp4 with ffmpeg. Output specs unchanged: 1080x1920, 30fps, h264 crf 16.**
+  - `.github/workflows/render-speed-test.yml` — ONE job, stills frames 0-9, prints RENDER_SECONDS and
     SECONDS_PER_FRAME, runs an ffmpeg signalstats blank check (YDIF must be > 0), uploads the 10-frame
-    clip `speed-test-10` (retention 1 day). **RUN THIS FIRST.**
+    clip `speed-test-10` (retention 1 day). **RUN THIS FIRST — and check EVERY frame of the clip
+    visually for tiling before running the full render.**
   - `.github/workflows/render.yml` — 20 parallel jobs (matrix shard 0–19), 63 frames/job (shard 19:
     1197–1253), each prints its SECONDS_PER_FRAME and uploads `part-N.mp4` (retention 1 day).
-    Both workflows use Playwright Chromium explicitly (`--browser-executable`, the proven WebGL path)
-    + `remotion browser ensure` as backup, `--gl swangle`, `REMOTION_TMP=$RUNNER_TEMP/remotion-tmp`.
-- **Scaling rule (decided after the speed test):** if Actions measures ~30–50 s/frame, 20 jobs x 63
-  frames finish in ~35–55 min wall time. If ~100 s/frame, ~1.75 h/job — still inside the 6 h job
+    Both workflows use Playwright Chromium explicitly (MANJHI_CHROME, the proven WebGL path)
+    + `remotion browser ensure` as backup, `--gl swangle` (inside the shard script),
+    `REMOTION_TMP=$RUNNER_TEMP/remotion-tmp`.
+- **Scaling rule (decided after the speed test):** stills cost ~15-25 s/frame on Actions (browser
+  launch + page load + world build + render per frame), so 20 jobs x 63 frames finish in
+  ~20-30 min wall time. If ~60 s/frame, ~1 h/job — still inside the 6 h job
   limit, no change needed. If >~200 s/frame, split further (40 shards x ~32 frames) before running.
   Do NOT run the full workflow before the speed test reports.
 - Merge locally with `scripts/merge-parts.sh [parts-dir]` (executable): verifies all 20 parts exist ->
@@ -67,8 +78,9 @@ so these ARE full-res frame costs), seconds per frame:
 - **Kaggle (6.1 s/frame kit) and Colab (~15–17 s/frame) are FALLBACKS ONLY.** Actions does ~95% of
   the work. Do NOT waste build time setting up Kaggle/Colab unless Actions is blocked (e.g. the
   browser renders blank on Actions, or the speed test shows an unusable rate). If Actions is blocked,
-  the fallback is Kaggle CPU with the same frame-range split (one notebook per range, `npx remotion
-  render --frames=A-B --gl swangle`), merged the same way.
+  the fallback is Kaggle CPU with the same frame-range split (one notebook per range, using
+  `scripts/manjhi-render-shard.mjs --frames=A-B`, NOT `npx remotion render --frames=A-B`, which
+  tiles), merged the same way.
 
 ## Chromium flags that matter (learned the hard way)
 - `gl: "swiftshader"` is WRONG in Remotion 4.0.542: it maps to the obsolete `--use-gl=swiftshader`

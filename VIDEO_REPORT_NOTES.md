@@ -77,9 +77,32 @@ Checked 2026-11-10 against `~/workspace/your_files/claude-animated-shorts/claude
 | references/STYLE_BIBLE.md, references/frames/ (38), references/sheets/ (20), references/reports/ (8: CONTEXT.md + 7) | ✓ | — |
 | templates/bridge/ (13 .ts files: Bridge/story/world/cast/toon/build/paint/lights/shade/ink/lensblur/grade) | ✓ | — |
 | templates/audio/ (8 .py + cues.md), templates/scripts/ (5 files) | ✓ | — |
-| **Kenney GLB files (`public/bridge/kenney/*.glb`)** | ✗ **0 .glb files in the whole zip; no `public/` folder at all** | TOLERATED: loadKit() catches per-file failures; trees/bushes/hedges are code-drawn veg; only lantern/cart/stall/windmill/canoe/lily/flowers are absent — the Manjhi world does not use them. SKILL.md names the "Kenney CC0 kit" but gives no download link. (The author's own note says his public/ was ~1.3 GB — the zip ships none of it.) |
+| **Kenney GLB files (`public/bridge/kenney/*.glb`)** | ⚠ **15 of 26 placed 2026-11-10** (Kenney Nature Kit, CC0, https://kenney.nl/assets/nature-kit — tree_oak, tree_default, tree_detailed, tree_fat, tree_cone, plant_bush, plant_bushLarge, plant_bushDetailed, flower_redA, flower_yellowA, flower_purpleA, grass, grass_large, lily_large, canoe; each verified as valid glTF 2.0). 11 of the 26 names NEVER need a GLB (tree_oak/tree_default/tree_detailed/tree_fat/tree-high-round/tree/tree_cone/plant_bush/plant_bushLarge/plant_bushDetailed/hedge are procedural code-drawn veg via `build.ts` VEG map; banner-red/banner-green are painted cloth). 6 names (lantern, cart, stall-red, stall-green, stall-bench, windmill) do NOT exist in Kenney's catalog under those filenames — 8 kits checked (nature, castle, pirate, graveyard, city-commercial, food, furniture, mini-shop), no exact match; likely hallucinated by the skill author's Claude. The Manjhi world DOES call `prop()` with lantern (village lane + market), stall-red/green/bench + cart (market), windmill (far corner) — those props are silently absent (loadKit catches per-file failures), so the market lacks stalls/cart and the lane lacks lanterns; the look-check passed without them. SKILL.md names the "Kenney CC0 kit" but gives no download link. (The author's own note says his public/ was ~1.3 GB — the zip ships none of it.) |
 | **package.json / Remotion project scaffold (src/Root.tsx, src/index.ts, remotion.config.ts)** | ✗ **none** | WORKED AROUND: the project was scaffolded by hand and versions pinned (remotion 4.0.542, three 0.169.0, @react-three/fiber 8.18.0, @react-three/postprocessing 2.16.3, postprocessing 6.39.6). A fresh setup from the zip alone cannot `npm install` — SKILL.md step 4 assumes a Remotion project already exists ("copy templates/bridge/ … to src/videos/<name>/, register a new composition next to BridgeShort in src/Root.tsx"). |
 | Version pinning | ✗ none in the zip | Consequence: the Ancient Jar build (fiber 9 + three 0.187) hit the blank-canvas bug that this build (fiber 8 + three 0.169) dodged in stills mode — see the PostDriver fix in Manjhi.tsx. |
 
 Nothing else is absent. The zip is complete as a skill + template library; it is NOT a runnable
 project, and the Kenney props must be sourced separately (kenney.nl, CC0) or done without, as here.
+(The 15 Nature-Kit GLBs were sourced and placed 2026-11-10 — see the updated Kenney row above.)
+
+## 6. Tiling defect in `remotion render` — fixed by rendering stills (2026-11-10)
+
+The GitHub Actions speed test (10 frames, 6.1 s/frame) rendered frame 0 perfectly but
+frames 1–9 TILED: the mountain/sky repeats ~5x vertically with a vertical seam at 780px
+(1080x1920). Reproduced locally and diagnosed by elimination:
+
+- Post chain OFF still tiles → PostDriver/Ink/LensBlur/Bloom/Grade exonerated.
+- Single-frame render (`--frames=1-1`) is correct; a fresh page/still is always correct.
+- All sizes 1080x1920 at composer construction and on every `useFrame` (TEMPORARY
+  `[TILE-DIAG]` logging, since removed) → size-mismatch hypothesis ruled out.
+- Per-frame Canvas remount (`key={frame}`, fresh WebGL context) still tiles at 780x380.
+- `preserveDrawingBuffer: true` BLANKS the render (uniform pale colour) + OOMs the VM — reverted.
+- `--gl angle-egl` has no WebGL context on this VM. Scale 0.5 ALSO tiles (vertical period 490).
+- Root cause: a Chrome/SwiftShader compositor/screenshot defect when a large WebGL canvas
+  is re-presented in the same page session — NOT our scene code. No code change fixes it.
+
+FIX: render each frame as a still (`renderStill`, fresh browser/page per frame) and encode
+with ffmpeg — `scripts/manjhi-render-shard.mjs` (shard or `--frames A-B` mode). Both
+workflows (`.github/workflows/render.yml`, `render-speed-test.yml`) now use it. Output specs
+unchanged: 1080x1920, 30fps, h264 crf 16. Expected ~15–25 s/frame on Actions; verify the
+speed-test clip frame-by-frame for tiling before running the full 20-shard render.
