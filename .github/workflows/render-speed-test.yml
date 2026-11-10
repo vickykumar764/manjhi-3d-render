@@ -1,9 +1,13 @@
 # Manjhi 3D short — 10-frame speed test on GitHub Actions
-# PURPOSE: measure the REAL Remotion per-frame speed on an Actions runner BEFORE committing to
-# the full 1,254-frame render. The local VM renders ~160-200 s/frame through the PostDriver
+# PURPOSE: measure the REAL per-frame speed on an Actions runner BEFORE committing to
+# the full 1,254-frame render, AND verify the frames are NOT tiled (the reason this
+# uses STILLS, not `remotion render` — see render.yml header for the tiling defect).
+# The local VM renders ~160-200 s/frame through the PostDriver
 # (f200 197.7 s, f350 161.5 s, scale 0.5 stills) — the Actions number is unknown and decides
 # the shard count for the full run. Run this FIRST (Actions tab -> Run workflow).
 # EXPECTED: the 10-frame clip `speed-test-10` + a log line "SECONDS_PER_FRAME=<x>".
+# Then CHECK EVERY FRAME of the clip visually for tiling (mountain/sky repeating
+# vertically, seam at ~88% width) — do NOT run the full render on a tiled speed test.
 # If the clip is blank/black, the browser path is wrong (see the --browser-executable note below).
 name: Manjhi speed test (10 frames)
 
@@ -33,25 +37,17 @@ jobs:
           npx playwright install --with-deps chromium
           npx remotion browser ensure
 
-      - name: Install ffmpeg (ffprobe/ffmpeg for checks)
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Render frames 0-9
+      - name: Install ffmpeg (ffprobe is used after the render; NOT preinstalled on ubuntu-latest — without this the run fails "ffprobe: command not found", exit 127, even though the render itself succeeded)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Render frames 0-9 (stills + ffmpeg)
         env:
           REMOTION_TMP: ${{ runner.temp }}/remotion-tmp
         run: |
           CHROME=$(find ~/.cache/ms-playwright -name chrome -type f | head -1)
           echo "Chrome: $CHROME"
           mkdir -p out
-          START=$(date +%s)
-          npx remotion render src/index.ts ManjhiShort out/speed-test-10.mp4 \
-            --codec h264 --crf 16 --scale 1.0 --frames=0-9 --gl swangle --overwrite \
-            --browser-executable="$CHROME"
-          END=$(date +%s)
-          SECONDS=$((END - START))
-          echo "RENDER_SECONDS=$SECONDS for 10 frames"
-          echo "SECONDS_PER_FRAME=$(python3 -c "print(round($SECONDS/10, 2))")"
-          ffprobe -v error -show_entries stream=width,height,r_frame_rate,nb_frames,duration \
-            -of default=noprint_wrappers=1 out/speed-test-10.mp4
+          MANJHI_CHROME="$CHROME" node scripts/manjhi-render-shard.mjs --frames 0-9 --out out/speed-test-10.mp4
 
       - name: Blank check (frames must vary, not one flat colour)
         # A blank render has YDIF ~ 0 (no change between frames). Prints YAVG/YDIF per frame;
