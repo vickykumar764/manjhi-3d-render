@@ -35,9 +35,9 @@ jobs:
           npx playwright install --with-deps chromium
           npx remotion browser ensure
 
-            - name: Install ffmpeg (ffprobe/ffmpeg for checks)
-                    run: sudo apt-get update && sudo apt-get install -y ffmpeg
-                    - name: Render shard ${{ matrix.shard }}
+      - name: Install ffmpeg (ffprobe/ffmpeg for checks)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Render shard ${{ matrix.shard }}
         env:
           REMOTION_TMP: ${{ runner.temp }}/remotion-tmp
         run: |
