@@ -37,7 +37,7 @@ jobs:
           npx playwright install --with-deps chromium
           npx remotion browser ensure
 
-      - name: Install ffmpeg (ffprobe is used after the render; NOT preinstalled on ubuntu-latest — without this the run fails "ffprobe: command not found", exit 127, even though the render itself succeeded)
+      - name: "Install ffmpeg (ffprobe is used after the render; NOT preinstalled on ubuntu-latest — without this the run fails \"ffprobe: command not found\", exit 127, even though the render itself succeeded)"
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
       - name: Render frames 0-9 (stills + ffmpeg)
