@@ -33,7 +33,9 @@ jobs:
           npx playwright install --with-deps chromium
           npx remotion browser ensure
 
-      - name: Render frames 0-9
+            - name: Install ffmpeg (ffprobe/ffmpeg for checks)
+                    run: sudo apt-get update && sudo apt-get install -y ffmpeg
+                    - name: Render frames 0-9
         env:
           REMOTION_TMP: ${{ runner.temp }}/remotion-tmp
         run: |
